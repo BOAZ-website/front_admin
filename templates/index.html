@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>지원자 대시보드</title>
   <link rel="stylesheet" href="/static/styles.css">
+
 </head>
 <body>
 
@@ -80,14 +81,6 @@
       <option value="name|desc">이름 내림차순</option>
       <option value="university|asc">대학교순</option>
     </select>
-    <button class="csv-btn" onclick="downloadCSV()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
-      </svg>
-      CSV 다운로드
-    </button>
   </div>
 </div>
 
@@ -132,6 +125,10 @@
   <div class="panel-tabs">
     <button class="panel-tab active" id="pt-app" onclick="switchTab('app')">📄 지원서</button>
     <button class="panel-tab" id="pt-eval" onclick="switchTab('eval')">✏️ 평가</button>
+    <div class="panel-tab-actions">
+      <button class="panel-nav-btn" id="prev-applicant" onclick="moveApplicant(-1)" title="이전 지원자">이전</button>
+      <button class="panel-nav-btn" id="next-applicant" onclick="moveApplicant(1)" title="다음 지원자">다음</button>
+    </div>
   </div>
   <div class="panel-body" id="panel-body">
     <div class="loading-cell">불러오는 중...</div>
@@ -186,9 +183,9 @@ async function get(url) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
-async function post(url, data) {
+async function post(url, data, method = 'POST') {
   const r = await fetch(url, {
-    method: 'POST',
+    method,
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(data),
   });
@@ -240,14 +237,14 @@ async function loadApplicants() {
   try {
     const f = S.filters;
     const p = new URLSearchParams();
-    if (f.recruitment_id) p.set('recruitment_id', f.recruitment_id);
     if (f.track)          p.set('track', f.track);
     if (f.status)         p.set('status', f.status);
     if (f.decision)       p.set('decision', f.decision);
     if (f.search)         p.set('search', f.search);
     p.set('sort', f.sort); p.set('order', f.order);
 
-    S.applicants = await get('/api/applicants?' + p);
+    const qs = p.toString();
+    S.applicants = await get(`/api/v1/admin/recruitment/${f.recruitment_id}/applicants` + (qs ? '?' + qs : ''));
     render();
   } catch(e) {
     document.getElementById('tbody').innerHTML =
@@ -290,14 +287,15 @@ function render() {
 }
 
 // ── Panel ─────────────────────────────────────────────────
-async function openPanel(id) {
+async function openPanel(id, preferredTab = 'app') {
   S.currentId = id;
-  S.tab = 'app';
+  S.tab = preferredTab;
   document.getElementById('overlay').classList.add('active');
   document.getElementById('panel').classList.add('open');
-  document.getElementById('pt-app').classList.add('active');
-  document.getElementById('pt-eval').classList.remove('active');
+  document.getElementById('pt-app').classList.toggle('active', preferredTab === 'app');
+  document.getElementById('pt-eval').classList.toggle('active', preferredTab === 'eval');
   document.getElementById('panel-body').innerHTML = '<div class="loading-cell">불러오는 중...</div>';
+  updatePanelNav();
   // highlight row
   document.querySelectorAll('#tbody tr').forEach(tr => {
     tr.classList.toggle('selected', tr.onclick?.toString().includes(`(${id})`));
@@ -328,6 +326,7 @@ function closePanel() {
   document.getElementById('overlay').classList.remove('active');
   document.getElementById('panel').classList.remove('open');
   document.querySelectorAll('#tbody tr').forEach(tr => tr.classList.remove('selected'));
+  updatePanelNav();
 }
 
 function switchTab(tab) {
@@ -335,6 +334,26 @@ function switchTab(tab) {
   document.getElementById('pt-app').classList.toggle('active', tab==='app');
   document.getElementById('pt-eval').classList.toggle('active', tab==='eval');
   renderBody();
+}
+
+function updatePanelNav() {
+  const list = S.applicants;
+  const idx = list.findIndex(a => a.id === S.currentId);
+  const prev = document.getElementById('prev-applicant');
+  const next = document.getElementById('next-applicant');
+  if (!prev || !next) return;
+  prev.disabled = idx <= 0;
+  next.disabled = idx === -1 || idx >= list.length - 1;
+}
+
+function moveApplicant(step) {
+  const list = S.applicants;
+  const idx = list.findIndex(a => a.id === S.currentId);
+  if (idx === -1 || !list.length) return;
+  const next = list[idx + step];
+  if (!next) return;
+  openPanel(next.id, S.tab);
+  render();
 }
 
 function renderBody() {
@@ -507,7 +526,7 @@ async function saveEval() {
   msg.className = 'save-msg'; msg.textContent = '';
 
   try {
-    await post(`/api/evaluations/${S.currentId}`, S.draft);
+    await post(`/api/v1/admin/recruitment/applicants/${S.currentId}/evaluations/me`, S.draft, 'PUT');
     msg.className = 'save-msg ok'; msg.textContent = '✓ 저장되었습니다';
     btn.textContent = '저장하기'; btn.disabled = false;
 
@@ -556,20 +575,6 @@ function onSortChange() {
   const [col, ord] = document.getElementById('sel-sort').value.split('|');
   S.filters.sort = col; S.filters.order = ord;
   loadApplicants();
-}
-
-// ── CSV Download ─────────────────────────────────────────
-function downloadCSV() {
-  const f = S.filters;
-  const p = new URLSearchParams();
-  if (f.recruitment_id) p.set('recruitment_id', f.recruitment_id);
-  if (f.track)          p.set('track', f.track);
-  if (f.status)         p.set('status', f.status);
-  if (f.decision)       p.set('decision', f.decision);
-  if (f.search)         p.set('search', f.search);
-  p.set('sort', f.sort);
-  p.set('order', f.order);
-  window.location.href = '/api/applicants/export?' + p;
 }
 
 // ── Go ────────────────────────────────────────────────────

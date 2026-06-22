@@ -269,6 +269,21 @@ tbody tr.selected { background: #eff6ff !important; }
 .badge.d-fail    { background: #fee2e2; color: #dc2626; }
 .badge.d-hold    { background: #fef9c3; color: #ca8a04; }
 
+.final-select {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+.final-select:focus { border-color: #94a3b8; }
+.final-select.d-pending { background: #f1f5f9; color: #94a3b8; }
+.final-select.d-pass    { background: #dcfce7; color: #16a34a; }
+.final-select.d-fail    { background: #fee2e2; color: #dc2626; }
+.final-select.d-hold    { background: #fef9c3; color: #ca8a04; }
+
 .metric {
   display: inline-flex;
   align-items: center;

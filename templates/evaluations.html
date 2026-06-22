@@ -189,7 +189,7 @@ function normalizeRows(applicants) {
       ...a,
       evaluator_evaluations: evaluatorEvaluations,
       personal_evaluation: a.personal_evaluation || a.eval || { decision:'pending', score:null, memo:'' },
-      final_evaluation: a.final_evaluation || { decision:'pending', score:null, memo:'' },
+      final_evaluation: a.final_evaluation || { decision: (a.eval && a.eval.final_decision) || 'pending' },
       ...summary,
     };
   });
@@ -221,13 +221,13 @@ async function loadEvaluationDashboard() {
   try {
     const f = S.filters;
     const p = new URLSearchParams();
-    if (f.recruitment_id) p.set('recruitment_id', f.recruitment_id);
     if (f.track) p.set('track', f.track);
     if (f.search) p.set('search', f.search);
     p.set('sort', 'created_at');
     p.set('order', 'desc');
 
-    const applicants = await get('/api/applicants?' + p);
+    const qs = p.toString();
+    const applicants = await get(`/api/v1/admin/recruitment/${f.recruitment_id}/applicants/evaluations` + (qs ? '?' + qs : ''));
     S.rows = normalizeRows(applicants);
     render();
   } catch(e) {
@@ -281,7 +281,7 @@ function render() {
       <td><span class="metric fail">${a.fail_count}</span></td>
       <td><strong>${a.total_score}</strong></td>
       <td>${decBadge(a.personal_evaluation?.decision)}</td>
-      <td>${decBadge(a.final_evaluation?.decision)}</td>
+      <td class="final-cell" onclick="event.stopPropagation()">${finalSelect(a)}</td>
     </tr>`).join('');
 }
 
@@ -424,6 +424,33 @@ function buildApplicationTab(d) {
           <div class="answer-text">${esc(ans.answer_text || JSON.stringify(ans.answer_json || '', null, 2) || '답변 없음')}</div>
         </div>`).join('') : '<p style="color:#94a3b8;font-size:13px">답변이 없습니다.</p>'}
     </div>`;
+}
+const FINAL_OPTIONS = ['pending','pass','hold','fail'];
+function finalSelect(a) {
+  const cur = a.final_evaluation?.decision || 'pending';
+  const opts = FINAL_OPTIONS.map(v =>
+    `<option value="${v}" ${v === cur ? 'selected' : ''}>${DEC_LABEL[v]}</option>`
+  ).join('');
+  return `<select class="final-select d-${cur}" onchange="changeFinal(${a.id}, this.value)">${opts}</select>`;
+}
+async function changeFinal(id, next) {
+  const row = S.rows.find(r => r.id === id);
+  if (!row) return;
+  const prev = row.final_evaluation?.decision || 'pending';
+  row.final_evaluation = { ...(row.final_evaluation || {}), decision: next };
+  render();
+  try {
+    const r = await fetch(`/api/v1/admin/recruitment/applicants/${id}/final-decision`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ final_decision: next }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  } catch(e) {
+    console.warn('최종 평가 저장 실패:', e);
+    row.final_evaluation.decision = prev;
+    render();
+  }
 }
 function pickFinalDecision(v) {
   S.finalDraft.decision = v;
