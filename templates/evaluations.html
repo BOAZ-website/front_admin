@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>평가자 대시보드</title>
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
@@ -17,11 +17,11 @@
     <span class="header-title">평가자 대시보드</span>
     <nav class="header-nav">
       <a class="header-link" href="/">지원자</a>
-      <a class="header-link active" href="/evaluations">평가자</a>
+      <a class="header-link active" href="/evaluations.html">평가자</a>
     </nav>
     <div class="auth-status" id="auth-status">
       <span class="auth-dot checking" aria-hidden="true"></span>
-      <span id="auth-status-text">로그인 확인 중</span>
+      <a class="auth-status-link" id="auth-status-text" href="/login.html">로그인</a>
     </div>
   </div>
   <div class="header-stats" id="header-stats"></div>
@@ -77,8 +77,11 @@
 
 <div class="main">
   <div class="table-meta">
-    <span class="table-count" id="tbl-count">불러오는 중...</span>
-    <span class="table-hint">지원자를 클릭하면 지원서, 개인 평가, 평가 현황을 볼 수 있습니다.</span>
+    <div class="table-meta-text">
+      <span class="table-count" id="tbl-count">불러오는 중...</span>
+      <span class="table-hint">지원자를 클릭하면 지원서, 개인 평가, 평가 현황을 볼 수 있습니다.</span>
+    </div>
+    <button class="panel-refresh" onclick="refreshEvaluationDashboard()" title="새로고침" type="button">새로고침</button>
   </div>
   <div class="table-wrap eval-table-wrap">
     <table>
@@ -112,12 +115,16 @@
       <span class="panel-name" id="p-name">-</span>
       <span class="badge" id="p-track"></span>
     </div>
-    <button class="panel-close" onclick="closePanel()" title="닫기">X</button>
+    <div class="panel-hdr-actions">
+      <button class="panel-refresh" id="panel-refresh" onclick="refreshEvaluationDashboard()" title="새로고침" type="button">새로고침</button>
+      <button class="panel-close" onclick="closePanel()" title="닫기">X</button>
+    </div>
   </div>
   <div class="panel-tabs">
     <button class="panel-tab active" id="pt-app" onclick="switchTab('app')">지원서</button>
     <button class="panel-tab" id="pt-final" onclick="switchTab('final')">개인 평가</button>
     <button class="panel-tab" id="pt-status" onclick="switchTab('status')">평가 현황</button>
+    <button class="panel-tab" id="pt-interview" onclick="switchTab('interview')">면접 질문</button>
     <div class="panel-tab-actions">
       <button class="panel-nav-btn" onclick="moveApplicant(-1)" title="이전 지원자">이전</button>
       <button class="panel-nav-btn" onclick="moveApplicant(1)" title="다음 지원자">다음</button>
@@ -135,7 +142,7 @@ const S = {
   currentId: null,
   currentData: null,
   tab: 'app',
-  finalDraft: { decision:'pending', score:null, memo:'' },
+  finalDraft: { decision:'pending', score:null, memo:'', interview_question:'' },
 };
 
 const TRACK_LABEL = { ANALYSIS:'분석', VISUALIZATION:'시각화', ENGINEERING:'엔지니어링' };
@@ -156,10 +163,187 @@ function decBadge(decision) {
   const d = decision || 'pending';
   return `<span class="badge d-${d}">${DEC_LABEL[d] || d}</span>`;
 }
-async function get(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+function tryParseJson(value) {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed || !/^[\[{]/.test(trimmed)) return value;
+  try { return JSON.parse(trimmed); } catch (_) { return value; }
+}
+function isUrl(value) {
+  return /^https?:\/\/\S+$/i.test(String(value || '').trim());
+}
+function linkifyText(value) {
+  const text = String(value ?? '');
+  const urlPattern = /(https?:\/\/[^\s<]+)/g;
+  let lastIndex = 0;
+  let html = '';
+
+  text.replace(urlPattern, (url, _match, offset) => {
+    html += esc(text.slice(lastIndex, offset));
+    html += `<a class="answer-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`;
+    lastIndex = offset + url.length;
+    return url;
+  });
+
+  html += esc(text.slice(lastIndex));
+  return html || '답변 없음';
+}
+function formatAnswerKey(key) {
+  const labels = {
+    date: '날짜',
+    day: '요일',
+    time: '시간',
+    start: '시작',
+    end: '종료',
+    available: '가능 여부',
+    memo: '메모'
+  };
+  return labels[key] || String(key).replace(/_/g, ' ');
+}
+function renderNestedAnswerValue(value) {
+  if (Array.isArray(value)) {
+    if (!value.length) return '<em>-</em>';
+    return `<div class="answer-chip-row">${value.map(item => `<span>${esc(typeof item === 'object' && item !== null ? JSON.stringify(item) : item)}</span>`).join('')}</div>`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value);
+    if (!entries.length) return '<em>-</em>';
+    return `<div class="answer-mini-grid">${entries.map(([key, val]) => `<div><span>${esc(formatAnswerKey(key))}</span><strong>${esc(Array.isArray(val) ? val.join(', ') : val ?? '-')}</strong></div>`).join('')}</div>`;
+  }
+  return esc(value ?? '-');
+}
+function renderObjectAnswer(value) {
+  const entries = Object.entries(value || {});
+  if (!entries.length) return '<div class="answer-text muted">답변 없음</div>';
+
+  return `<div class="answer-json-grid">${entries.map(([key, val]) =>
+    `<div class="answer-json-row"><span>${esc(formatAnswerKey(key))}</span><strong>${renderNestedAnswerValue(val)}</strong></div>`
+  ).join('')}</div>`;
+}
+function renderArrayAnswer(items) {
+  if (!items.length) return '<div class="answer-text muted">답변 없음</div>';
+
+  if (items.every(item => typeof item === 'object' && item !== null && !Array.isArray(item))) {
+    return `<div class="answer-time-grid">${items.map(item => {
+      const primary = item.date || item.day || item.time || item.label || item.name || '-';
+      const secondary = [item.start, item.end].filter(Boolean).join(' - ') || item.value || item.available || item.memo || '';
+      return `<div class="answer-time-card"><span>${esc(primary)}</span><strong>${esc(secondary || '-')}</strong></div>`;
+    }).join('')}</div>`;
+  }
+
+  return `<div class="answer-list">${items.map(item => `<div>${esc(typeof item === 'object' ? JSON.stringify(item) : item)}</div>`).join('')}</div>`;
+}
+function renderAnswerValue(rawAnswer) {
+  const answer = tryParseJson(rawAnswer);
+
+  if (Array.isArray(answer)) return renderArrayAnswer(answer);
+  if (answer && typeof answer === 'object') return renderObjectAnswer(answer);
+  if (isUrl(answer)) {
+    const url = String(answer).trim();
+    return `<a class="answer-link-card" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`;
+  }
+  return `<div class="answer-text">${linkifyText(answer || '답변 없음')}</div>`;
+}
+const API_BASE_URL = 'https://dev.bigdataboaz.com';
+function apiUrl(path) {
+  return path.startsWith('http') ? path : API_BASE_URL + path;
+}
+function authHeaders(extra = {}) {
+  const token = sessionStorage.getItem('access_token');
+  return {
+    ...extra,
+    ...(token ? { Authorization: 'Bearer ' + token } : {})
+  };
+}
+function unwrapApiResponse(result) {
+  return result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result;
+}
+function toApiDecision(decision) {
+  return String(decision || 'pending').toUpperCase();
+}
+function fromApiDecision(decision) {
+  return String(decision || 'PENDING').toLowerCase();
+}
+function normalizeRecruitments(result) {
+  return (unwrapApiResponse(result) || []).map(item => ({
+    ...item,
+    id: item.recruitment_id || item.id,
+    label: item.term ? `${item.term}기` : `공고 #${item.recruitment_id || item.id}`
+  })).filter(item => item.id);
+}
+function applicantListUrl(recruitmentId) {
+  return '/api/v1/admin/recruitment/' + encodeURIComponent(recruitmentId) + '/applicants/evaluations';
+}
+async function request(url, options = {}) {
+  const send = async () => {
+    const response = await fetch(apiUrl(url), {
+      credentials: 'include',
+      ...options,
+      headers: authHeaders(options.headers || {})
+    });
+
+    let result = null;
+    try {
+      result = await response.json();
+    } catch (_) {}
+
+    return { response, result };
+  };
+
+  let { response, result } = await send();
+
+  if (response.status === 401) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) {
+      ({ response, result } = await send());
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(result?.message || result?.error?.message || result?.error_code || `HTTP ${response.status}`);
+  }
+
+  return unwrapApiResponse(result);
+}
+function get(url) {
+  return request(url, { method: 'GET' });
+}
+function put(url, data) {
+  return request(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+}
+function patch(url, data) {
+  return request(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+}
+async function loadMyEvaluation(applicantId) {
+  const evaluation = await get('/api/v1/admin/recruitment/applicants/' + applicantId + '/evaluations/me');
+  return evaluation ? { ...evaluation, decision: fromApiDecision(evaluation.decision) } : { decision:'pending', score:null, memo:'' };
+}
+async function loadEvaluatorEvaluations(applicantId) {
+  const result = await get('/api/v1/admin/recruitment/applicants/' + applicantId + '/evaluations');
+  return ((result && result.evaluations) || []).map(item => ({
+    ...item,
+    reviewer_name: item.name,
+    decision: fromApiDecision(item.decision)
+  }));
+}
+async function loadApplicantInterviewQuestions(applicantId) {
+  const result = await get('/api/v1/admin/recruitment/applicants/' + applicantId + '/interview-questions');
+  return ((result && result.interview_questions) || []).map(item => ({
+    ...item,
+    reviewer_name: item.name
+  }));
+}
+async function loadApplicantAnswers(applicantId) {
+  const result = await get('/api/v1/admin/recruitment/applicants/' + applicantId + '/answers');
+  return (result && result.answers) || [];
 }
 
 function buildPlaceholderEvaluations(applicant) {
@@ -186,15 +370,29 @@ function summarizeEvaluations(evaluations) {
   };
 }
 function normalizeRows(applicants) {
-  return applicants.map(a => {
-    const evaluatorEvaluations = a.evaluator_evaluations || a.evaluations || buildPlaceholderEvaluations(a);
-    const summary = a.evaluation_summary || summarizeEvaluations(evaluatorEvaluations);
+  return (applicants || []).map(a => {
+    const personalEvaluation = a.personal_evaluation || a.eval || {};
+    const myDecision = a.my_decision ?? a.mydecision ?? personalEvaluation.decision;
+
     return {
       ...a,
-      evaluator_evaluations: evaluatorEvaluations,
-      personal_evaluation: a.personal_evaluation || a.eval || { decision:'pending', score:null, memo:'' },
-      final_evaluation: a.final_evaluation || { decision: (a.eval && a.eval.final_decision) || 'pending' },
-      ...summary,
+      submitted_at: a.submitted_at || a.created_at || a.updated_at,
+      pass_count: Number(a.pass_count || 0),
+      hold_count: Number(a.hold_count || 0),
+      fail_count: Number(a.fail_count || 0),
+      total_score: Number(a.total_score || 0),
+      evaluator_evaluations: (a.evaluator_evaluations || a.evaluations || []).map(ev => ({
+        ...ev,
+        reviewer_name: ev.reviewer_name || ev.name,
+        decision: fromApiDecision(ev.decision)
+      })),
+      personal_evaluation: {
+        decision: fromApiDecision(myDecision),
+        score: personalEvaluation.score ?? null,
+        memo: personalEvaluation.memo || '',
+        interview_question: personalEvaluation.interview_question || ''
+      },
+      final_evaluation: { decision: fromApiDecision(a.final_decision) },
     };
   });
 }
@@ -206,32 +404,35 @@ async function init() {
 }
 async function loadRecruitments() {
   try {
-    const ids = await get('/api/recruitments');
+    const recruitments = normalizeRecruitments(await get('/api/v1/admin/recruitment'));
     const sel = document.getElementById('sel-rec');
-    ids.forEach(id => {
+    sel.innerHTML = '<option value="">공고 선택</option>';
+
+    recruitments.forEach(item => {
       const o = document.createElement('option');
-      o.value = id;
-      o.textContent = `공고 #${id}`;
+      o.value = item.id;
+      o.textContent = item.label;
       sel.appendChild(o);
     });
-    if (ids.length > 0) {
-      sel.value = ids[0];
-      S.filters.recruitment_id = String(ids[0]);
+
+    if (recruitments.length > 0) {
+      const active = recruitments.find(item => item.is_active) || recruitments[0];
+      sel.value = active.id;
+      S.filters.recruitment_id = String(active.id);
     }
   } catch(e) { console.warn('recruitments:', e); }
 }
 async function loadEvaluationDashboard() {
   document.getElementById('tbody').innerHTML = '<tr><td colspan="11" class="loading-cell">불러오는 중...</td></tr>';
-  try {
-    const f = S.filters;
-    const p = new URLSearchParams();
-    if (f.recruitment_id) p.set('recruitment_id', f.recruitment_id);
-    if (f.track) p.set('track', f.track);
-    if (f.search) p.set('search', f.search);
-    p.set('sort', 'created_at');
-    p.set('order', 'desc');
 
-    const applicants = await get('/api/applicants?' + p);
+  if (!S.filters.recruitment_id) {
+    S.rows = [];
+    render();
+    return;
+  }
+
+  try {
+    const applicants = await get(applicantListUrl(S.filters.recruitment_id));
     S.rows = normalizeRows(applicants);
     render();
   } catch(e) {
@@ -240,10 +441,20 @@ async function loadEvaluationDashboard() {
   }
 }
 function visibleRows() {
+  const keyword = S.filters.search.trim().toLowerCase();
   let list = S.rows.slice();
+
+  if (S.filters.track) {
+    list = list.filter(r => r.track === S.filters.track);
+  }
   if (S.filters.final_decision) {
     list = list.filter(r => (r.personal_evaluation?.decision || 'pending') === S.filters.final_decision);
   }
+  if (keyword) {
+    list = list.filter(r => [r.name, r.email, r.university, r.major]
+      .some(value => String(value || '').toLowerCase().includes(keyword)));
+  }
+
   const { sort, order } = S.filters;
   list.sort((a, b) => {
     let av = sort === 'name' ? (a.name || '') : Number(a[sort] || 0);
@@ -289,13 +500,14 @@ function render() {
     </tr>`).join('');
 }
 
-function openPanel(id, preferredTab = 'app') {
+async function openPanel(id, preferredTab = 'app') {
   const row = S.rows.find(r => r.id === id);
   if (!row) return;
   S.currentId = id;
   S.currentData = row;
   S.tab = preferredTab;
-  S.finalDraft = { ...(row.personal_evaluation || { decision:'pending', score:null, memo:'' }) };
+  S.finalDraft = await loadMyEvaluation(id);
+  row.personal_evaluation = { ...S.finalDraft };
   document.getElementById('overlay').classList.add('active');
   document.getElementById('panel').classList.add('open');
   document.getElementById('p-name').textContent = row.name || '-';
@@ -311,11 +523,35 @@ function closePanel() {
   document.getElementById('panel').classList.remove('open');
   render();
 }
+async function refreshEvaluationDashboard() {
+  const currentId = S.currentId;
+  const currentTab = S.tab;
+  const buttons = document.querySelectorAll('.panel-refresh');
+
+  buttons.forEach(button => { button.disabled = true; });
+
+  try {
+    await loadEvaluationDashboard();
+
+    if (!currentId) return;
+
+    const row = S.rows.find(r => r.id === currentId);
+    if (!row) {
+      closePanel();
+      return;
+    }
+
+    await openPanel(currentId, currentTab);
+  } finally {
+    buttons.forEach(button => { button.disabled = false; });
+  }
+}
 function switchTab(tab) {
   S.tab = tab;
   document.getElementById('pt-app').classList.toggle('active', tab === 'app');
   document.getElementById('pt-final').classList.toggle('active', tab === 'final');
   document.getElementById('pt-status').classList.toggle('active', tab === 'status');
+  document.getElementById('pt-interview').classList.toggle('active', tab === 'interview');
   renderPanelBody();
 }
 function moveApplicant(step) {
@@ -332,26 +568,44 @@ async function renderPanelBody() {
   const d = S.currentData;
   if (!d) return;
   if (S.tab === 'status') {
-    el.innerHTML = buildStatusTab(d);
-  } else if (S.tab === 'final') {
-    el.innerHTML = buildFinalTab(d);
-  } else {
-    el.innerHTML = '<div class="loading-cell">지원서를 불러오는 중...</div>';
+    el.innerHTML = '<div class="loading-cell">평가 현황을 불러오는 중...</div>';
     try {
-      const full = await get(`/api/applicants/${d.id}`);
-      el.innerHTML = buildApplicationTab(full);
+      d.evaluator_evaluations = await loadEvaluatorEvaluations(d.id);
+      el.innerHTML = buildStatusTab(d);
+    } catch(e) {
+      el.innerHTML = `<div style="color:#ef4444;padding:20px">오류: ${esc(e.message)}</div>`;
+    }
+  } else if (S.tab === 'interview') {
+    el.innerHTML = '<div class="loading-cell">면접 질문을 불러오는 중...</div>';
+    try {
+      d.interview_questions = await loadApplicantInterviewQuestions(d.id);
+      el.innerHTML = buildInterviewQuestionsTab(d);
+    } catch(e) {
+      el.innerHTML = `<div style="color:#ef4444;padding:20px">오류: ${esc(e.message)}</div>`;
+    }
+  } else if (S.tab === 'final') {
+    el.innerHTML = '<div class="loading-cell">지원서와 개인 평가를 불러오는 중...</div>';
+    try {
+      d.answers = await loadApplicantAnswers(d.id);
+      el.innerHTML = buildApplicationEvalSplit(d);
+    } catch(e) {
+      el.innerHTML = `<div style="color:#ef4444;padding:20px">오류: ${esc(e.message)}</div>`;
+    }
+  } else {
+    el.innerHTML = '<div class="loading-cell">지원서 답변을 불러오는 중...</div>';
+    try {
+      d.answers = await loadApplicantAnswers(d.id);
+      el.innerHTML = buildApplicationTab(d);
     } catch(e) {
       el.innerHTML = `<div style="color:#ef4444;padding:20px">오류: ${esc(e.message)}</div>`;
     }
   }
 }
 function buildStatusTab(d) {
-  const decisionOrder = { pass: 0, hold: 1, fail: 2, pending: 3 };
   const rows = (d.evaluator_evaluations || []).slice().sort((a, b) => {
-    const ao = decisionOrder[a.decision] ?? 4;
-    const bo = decisionOrder[b.decision] ?? 4;
-    if (ao !== bo) return ao - bo;
-    return (Number(b.score) || -1) - (Number(a.score) || -1);
+    const an = a.reviewer_name || a.evaluator_name || a.name || '';
+    const bn = b.reviewer_name || b.evaluator_name || b.name || '';
+    return an.localeCompare(bn, 'ko');
   });
   return `
     <div class="section">
@@ -376,6 +630,28 @@ function buildStatusTab(d) {
       </table>
     </div>`;
 }
+function buildInterviewQuestionsTab(d) {
+  const rows = (d.interview_questions || []).slice().sort((a, b) => {
+    const an = a.reviewer_name || a.name || '';
+    const bn = b.reviewer_name || b.name || '';
+    return an.localeCompare(bn, 'ko');
+  });
+
+  return `
+    <div class="section">
+      <div class="section-title">면접 질문</div>
+      <table class="json-tbl interview-question-table">
+        <thead><tr><th>평가자</th><th>면접 질문</th></tr></thead>
+        <tbody>
+          ${rows.length ? rows.map(row => `
+            <tr>
+              <td>${esc(row.reviewer_name || row.name || '-')}</td>
+              <td>${esc(row.interview_question || '') || '<span class="muted-cell">미작성</span>'}</td>
+            </tr>`).join('') : '<tr><td colspan="2" class="muted-cell">면접 질문이 없습니다.</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
 function buildFinalTab() {
   const dr = S.finalDraft;
   const items = [
@@ -393,13 +669,22 @@ function buildFinalTab() {
       </div>
       <span class="eval-label">개인 점수</span>
       <div class="score-row">
-        <input class="score-input" type="number" min="0" max="100" step="1" value="${dr.score ?? ''}" oninput="S.finalDraft.score = this.value ? Number(this.value) : null">
+        <input class="score-input" type="number" min="1" max="10" step="1" value="${dr.score ?? ''}" oninput="S.finalDraft.score = this.value ? Number(this.value) : null">
         <span class="score-suffix">/ 10점</span>
       </div>
-      <span class="eval-label">대표진 메모</span>
+      <span class="eval-label">메모</span>
       <textarea class="memo-area" oninput="S.finalDraft.memo = this.value" placeholder="개인 평가 메모">${esc(dr.memo || '')}</textarea>
+      <span class="eval-label">면접 질문 제안</span>
+      <textarea class="memo-area" oninput="S.finalDraft.interview_question = this.value" placeholder="면접에서 확인하고 싶은 질문을 입력하세요">${esc(dr.interview_question || '')}</textarea>
       <button class="save-btn" onclick="saveFinalEvaluation()">저장하기</button>
       <div class="save-msg" id="save-msg"></div>
+    </div>`;
+}
+function buildApplicationEvalSplit(d) {
+  return `
+    <div class="app-eval-split">
+      <div class="app-eval-doc">${buildApplicationTab(d)}</div>
+      <aside class="app-eval-form">${buildFinalTab(d)}</aside>
     </div>`;
 }
 function buildApplicationTab(d) {
@@ -419,14 +704,19 @@ function buildApplicationTab(d) {
     <hr class="divider">
     <div class="section">
       <div class="section-title">지원 답변 (${answers.length}개)</div>
-      ${answers.length ? answers.map(ans => `
+      ${answers.length ? answers.map(ans => {
+        const label = ans.label || ans.q_label || `Q${ans.question_id}`;
+        const content = ans.content || ans.q_content || '';
+        const answer = ans.answer ?? ans.answer_text ?? ans.answer_json ?? '';
+        return `
         <div class="answer-item">
           <div class="answer-qid">
-            <span class="qid-tag">${esc(ans.q_label || `Q${ans.question_id}`)}</span>
-            <span style="font-size:13px;color:#475569;font-weight:500">${esc(ans.q_content || '')}</span>
+            <span class="qid-tag">${esc(label)}</span>
+            <span style="font-size:13px;color:#475569;font-weight:500">${esc(content)}</span>
           </div>
-          <div class="answer-text">${esc(ans.answer_text || JSON.stringify(ans.answer_json || '', null, 2) || '답변 없음')}</div>
-        </div>`).join('') : '<p style="color:#94a3b8;font-size:13px">답변이 없습니다.</p>'}
+          ${renderAnswerValue(answer)}
+        </div>`;
+      }).join('') : '<p style="color:#94a3b8;font-size:13px">답변이 없습니다.</p>'}
     </div>`;
 }
 
@@ -445,12 +735,9 @@ async function changeFinal(id, next) {
   row.final_evaluation = { ...(row.final_evaluation || {}), decision: next };
   render();
   try {
-    const r = await fetch(`/api/v1/admin/recruitment/applicants/${id}/final-decision`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ final_decision: next }),
+    await patch('/api/v1/admin/recruitment/applicants/' + id + '/final-decision', {
+      final_decision: toApiDecision(next)
     });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
   } catch(e) {
     console.warn('최종 평가 저장 실패:', e);
     row.final_evaluation = { ...(row.final_evaluation || {}), decision: prev };
@@ -462,14 +749,48 @@ function pickFinalDecision(v) {
   S.finalDraft.decision = v;
   renderPanelBody();
 }
-function saveFinalEvaluation() {
+async function saveFinalEvaluation() {
   const msg = document.getElementById('save-msg');
   const row = S.rows.find(r => r.id === S.currentId);
   if (!row) return;
-  row.personal_evaluation = { ...S.finalDraft };
-  msg.className = 'save-msg ok';
-  msg.textContent = 'API 연결 전 임시 저장 상태입니다.';
+
+  const prevEvaluation = { ...(row.personal_evaluation || {}) };
+  const prevMyDecision = row.my_decision ?? row.mydecision;
+  const nextEvaluation = {
+    ...S.finalDraft,
+    decision: fromApiDecision(S.finalDraft.decision)
+  };
+  row.personal_evaluation = { ...nextEvaluation };
+  row.my_decision = toApiDecision(nextEvaluation.decision);
+  S.finalDraft = { ...nextEvaluation };
   render();
+
+  try {
+    const saved = await put('/api/v1/admin/recruitment/applicants/' + S.currentId + '/evaluations/me', {
+      decision: toApiDecision(nextEvaluation.decision),
+      score: nextEvaluation.score,
+      memo: nextEvaluation.memo,
+      interview_question: nextEvaluation.interview_question
+    });
+
+    row.personal_evaluation = saved ? { ...saved, decision: fromApiDecision(saved.decision) } : { ...nextEvaluation };
+    row.my_decision = toApiDecision(row.personal_evaluation.decision);
+    S.finalDraft = { ...row.personal_evaluation };
+    msg.className = 'save-msg ok';
+    msg.textContent = '저장되었습니다.';
+    render();
+  } catch(e) {
+    row.personal_evaluation = { ...prevEvaluation };
+    if (prevMyDecision === undefined) {
+      delete row.my_decision;
+    } else {
+      row.my_decision = prevMyDecision;
+    }
+    S.finalDraft = { ...prevEvaluation };
+    render();
+    msg.className = 'save-msg err';
+    msg.textContent = '저장 실패: ' + e.message;
+  }
 }
 
 function onRecChange() {
@@ -481,12 +802,11 @@ function setPill(type, btn, val) {
   document.querySelectorAll(`#${groupIds[type]} .pill`).forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   S.filters[type] = val;
-  if (type === 'track') loadEvaluationDashboard();
-  else render();
+  render();
 }
 const onSearch = debounce(() => {
   S.filters.search = document.getElementById('search-input').value;
-  loadEvaluationDashboard();
+  render();
 }, 280);
 function onSortChange() {
   const [col, ord] = document.getElementById('sel-sort').value.split('|');
@@ -496,15 +816,36 @@ function onSortChange() {
 }
 
 async function refreshAccessToken() {
-  const response = await fetch('/api/v1/auth/refresh', {
-    method: 'POST',
-    credentials: 'include',
-  });
-  if (!response.ok) return null;
-  const result = await response.json();
-  const token = result && result.data && result.data.access_token;
-  if (token) sessionStorage.setItem('access_token', token);
-  return token || null;
+  const refreshUrls = [
+    '/api/v1/auth/admin/refresh'
+  ];
+
+  for (const path of refreshUrls) {
+    try {
+      const response = await fetch(apiUrl(path), {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (!response.ok) continue;
+
+      const result = await response.json();
+      const token =
+        result?.data?.access_token ||
+        result?.data?.accessToken ||
+        result?.access_token ||
+        result?.accessToken;
+
+      if (token) {
+        sessionStorage.setItem('access_token', token);
+        return token;
+      }
+    } catch (error) {
+      console.warn('refresh failed:', path, error);
+    }
+  }
+
+  return null;
 }
 
 async function getCurrentAccount() {
@@ -512,38 +853,57 @@ async function getCurrentAccount() {
   if (!token) token = await refreshAccessToken();
   if (!token) return null;
 
-  let response = await fetch('/api/v1/auth/me', {
+  const fallbackAccount = { username: '관리자' };
+
+  let response = await fetch(apiUrl('/api/v1/admin/accounts/me'), {
+    method: 'GET',
+    credentials: 'include',
     headers: { Authorization: 'Bearer ' + token },
   });
   if (response.status === 401) {
     token = await refreshAccessToken();
     if (!token) return null;
-    response = await fetch('/api/v1/auth/me', {
+    response = await fetch(apiUrl('/api/v1/admin/accounts/me'), {
+      method: 'GET',
+      credentials: 'include',
       headers: { Authorization: 'Bearer ' + token },
     });
   }
-  if (!response.ok) return null;
+  if (!response.ok) return fallbackAccount;
   const result = await response.json();
-  return (result && result.data) || null;
+  return result?.data || result?.user || result?.account || result || fallbackAccount;
+}
+
+async function logoutAdmin() {
+  try {
+    await fetch(apiUrl('/api/v1/auth/admin/logout'), {
+      method: 'POST',
+      credentials: 'include'
+    });
+  } catch (error) {
+    console.warn('logout failed:', error);
+  } finally {
+    sessionStorage.removeItem('access_token');
+    window.location.href = '/login.html';
+  }
 }
 
 async function renderAuthStatus() {
   const box = document.getElementById('auth-status');
-  const text = document.getElementById('auth-status-text');
-  if (!box || !text) return;
+  if (!box) return;
 
   try {
     const account = await getCurrentAccount();
     if (!account) {
       box.className = 'auth-status signed-out';
-      box.innerHTML = '<span class="auth-dot" aria-hidden="true"></span><a class="auth-status-link" href="/login">로그인 필요</a>';
+      box.innerHTML = '<span class="auth-dot" aria-hidden="true"></span><a class="auth-status-link" id="auth-status-text" href="/login.html">로그인</a>';
       return;
     }
     box.className = 'auth-status signed-in';
-    text.textContent = (account.username || '사용자') + ' 로그인됨';
+    box.innerHTML = `<span class="auth-dot" aria-hidden="true"></span><span class="auth-status-link">${esc(account.name || account.username || account.team_name || '관리자')} 로그인됨</span><button class="auth-logout" type="button" onclick="logoutAdmin()">로그아웃</button>`;
   } catch (error) {
     box.className = 'auth-status signed-out';
-    text.textContent = '로그인 확인 실패';
+    box.innerHTML = '<span class="auth-dot" aria-hidden="true"></span><a class="auth-status-link" id="auth-status-text" href="/login.html">로그인</a>';
   }
 }
 

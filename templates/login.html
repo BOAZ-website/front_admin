@@ -4,17 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>로그인</title>
-  <link rel="stylesheet" href="/static/styles.css">
+
+  <!-- S3 루트에 styles.css가 있으므로 /styles.css 사용 -->
+  <link rel="stylesheet" href="/styles.css">
+
+  <!-- favicon.ico 403 방지용 -->
+  <link rel="icon" href="data:,">
 </head>
+
 <body class="login-page">
   <main class="login-shell">
     <section class="login-panel">
-      <a class="login-back" href="/" aria-label="대시보드로 돌아가기">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <path d="m15 18-6-6 6-6"/>
-        </svg>
-        대시보드
-      </a>
+     
 
       <div class="login-brand">
         <div class="login-logo" aria-hidden="true">
@@ -32,12 +33,25 @@
       <form class="login-form" id="login-form">
         <label class="login-field">
           <span>아이디</span>
-          <input type="text" name="username" autocomplete="username" placeholder="아이디를 입력하세요" required autofocus>
+          <input
+            type="text"
+            name="username"
+            autocomplete="username"
+            placeholder="아이디를 입력하세요"
+            required
+            autofocus
+          >
         </label>
 
         <label class="login-field">
           <span>비밀번호</span>
-          <input type="password" name="password" autocomplete="current-password" placeholder="비밀번호를 입력하세요" required>
+          <input
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            placeholder="비밀번호를 입력하세요"
+            required
+          >
         </label>
 
         <p class="login-error" id="login-error" role="alert" aria-live="polite"></p>
@@ -49,33 +63,67 @@
         const submit = document.getElementById('login-submit');
         const errorBox = document.getElementById('login-error');
 
+        // 반드시 admin.bigdataboaz.com이 아니라 dev.bigdataboaz.com으로 요청
+        const LOGIN_API_URL = 'https://dev.bigdataboaz.com/api/v1/auth/admin/login';
+
         form.addEventListener('submit', async (event) => {
           event.preventDefault();
+
           errorBox.textContent = '';
           submit.disabled = true;
           submit.textContent = '로그인 중...';
 
           const formData = new FormData(form);
+
           try {
-            const response = await fetch('/api/v1/auth/login', {
+            console.log('LOGIN API URL:', LOGIN_API_URL);
+
+            const response = await fetch(LOGIN_API_URL, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json'
+              },
               credentials: 'include',
               body: JSON.stringify({
                 username: formData.get('username'),
-                password: formData.get('password'),
-              }),
+                password: formData.get('password')
+              })
             });
-            const result = await response.json();
+
+            let result = null;
+
+            try {
+              result = await response.json();
+            } catch (jsonError) {
+              result = null;
+            }
+
+            console.log('LOGIN RESPONSE STATUS:', response.status);
+            console.log('LOGIN RESPONSE BODY:', result);
 
             if (!response.ok) {
-              errorBox.textContent = result?.error?.message || '로그인에 실패했습니다.';
+              errorBox.textContent =
+                result?.error?.message ||
+                result?.message ||
+                '로그인에 실패했습니다.';
               return;
             }
 
-            sessionStorage.setItem('access_token', result.data.access_token);
-            window.location.href = '/evaluations';
+            const accessToken =
+              result?.data?.access_token ||
+              result?.data?.accessToken ||
+              result?.access_token ||
+              result?.accessToken;
+
+            if (accessToken) {
+              sessionStorage.setItem('access_token', accessToken);
+            }
+
+            // S3에는 evaluations가 아니라 evaluations.html이 있으므로 .html로 이동
+            window.location.href = '/evaluations.html';
+
           } catch (error) {
+            console.error('LOGIN ERROR:', error);
             errorBox.textContent = '서버에 연결할 수 없습니다.';
           } finally {
             submit.disabled = false;

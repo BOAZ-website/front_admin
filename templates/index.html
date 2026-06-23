@@ -4,9 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>지원자 대시보드</title>
-  <link rel="stylesheet" href="/static/styles.css">
 
+  <!-- S3 루트에 styles.css가 있으므로 /styles.css 사용 -->
+  <link rel="stylesheet" href="/styles.css">
+
+  <!-- favicon.ico 403 방지 -->
+  <link rel="icon" href="data:,">
 </head>
+
 <body>
 
 <!-- ── Header ──────────────────────────────────────────── -->
@@ -16,16 +21,20 @@
       <rect width="28" height="28" rx="8" fill="#3b82f6"/>
       <path d="M8 9h12M8 14h12M8 19h7" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
     </svg>
+
     <span class="header-title">지원자 대시보드</span>
+
     <nav class="header-nav">
-      <a class="header-link active" href="/">지원자</a>
-      <a class="header-link" href="/evaluations">평가자</a>
+      <a class="header-link active" href="/index.html">지원자</a>
+      <a class="header-link" href="/evaluations.html">평가자</a>
     </nav>
+
     <div class="auth-status" id="auth-status">
       <span class="auth-dot checking" aria-hidden="true"></span>
-      <span id="auth-status-text">로그인 확인 중</span>
+      <a class="auth-status-link" id="auth-status-text" href="/login.html">로그인</a>
     </div>
   </div>
+
   <div class="header-stats" id="header-stats"></div>
 </header>
 
@@ -41,8 +50,8 @@
   <div class="tb-group">
     <span class="tb-label">트랙</span>
     <div class="pill-group" id="track-pills">
-      <button class="pill active" data-track=""                   onclick="setPill('track',this,'')">전체</button>
-      <button class="pill p-ANALYSIS" data-track="ANALYSIS"       onclick="setPill('track',this,'ANALYSIS')">분석</button>
+      <button class="pill active" data-track="" onclick="setPill('track',this,'')">전체</button>
+      <button class="pill p-ANALYSIS" data-track="ANALYSIS" onclick="setPill('track',this,'ANALYSIS')">분석</button>
       <button class="pill p-VISUALIZATION" data-track="VISUALIZATION" onclick="setPill('track',this,'VISUALIZATION')">시각화</button>
       <button class="pill p-ENGINEERING" data-track="ENGINEERING" onclick="setPill('track',this,'ENGINEERING')">엔지니어링</button>
     </div>
@@ -51,29 +60,34 @@
   <div class="tb-group">
     <span class="tb-label">상태</span>
     <div class="pill-group" id="status-pills">
-      <button class="pill active" data-status=""            onclick="setPill('status',this,'')">전체</button>
-      <button class="pill" data-status="SUBMITTED"          onclick="setPill('status',this,'SUBMITTED')">제출</button>
-      <button class="pill" data-status="DRAFT"              onclick="setPill('status',this,'DRAFT')">임시저장</button>
+      <button class="pill active" data-status="" onclick="setPill('status',this,'')">전체</button>
+      <button class="pill" data-status="SUBMITTED" onclick="setPill('status',this,'SUBMITTED')">제출</button>
+      <button class="pill" data-status="DRAFT" onclick="setPill('status',this,'DRAFT')">임시저장</button>
     </div>
   </div>
 
   <div class="tb-group">
     <span class="tb-label">평가</span>
     <div class="pill-group" id="decision-pills">
-      <button class="pill active" data-dec=""         onclick="setPill('decision',this,'')">전체</button>
+      <button class="pill active" data-dec="" onclick="setPill('decision',this,'')">전체</button>
       <button class="pill p-pending" data-dec="pending" onclick="setPill('decision',this,'pending')">검토중</button>
-      <button class="pill p-pass" data-dec="pass"     onclick="setPill('decision',this,'pass')">합격</button>
-      <button class="pill p-hold" data-dec="hold"     onclick="setPill('decision',this,'hold')">보류</button>
-      <button class="pill p-fail" data-dec="fail"     onclick="setPill('decision',this,'fail')">불합격</button>
+      <button class="pill p-pass" data-dec="pass" onclick="setPill('decision',this,'pass')">합격</button>
+      <button class="pill p-hold" data-dec="hold" onclick="setPill('decision',this,'hold')">보류</button>
+      <button class="pill p-fail" data-dec="fail" onclick="setPill('decision',this,'fail')">불합격</button>
     </div>
   </div>
 
   <div class="search-wrap">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      <circle cx="11" cy="11" r="8"/>
+      <path d="m21 21-4.35-4.35"/>
     </svg>
-    <input type="search" id="search-input" placeholder="이름, 이메일, 대학교, 전공 검색..."
-           oninput="onSearch()">
+    <input
+      type="search"
+      id="search-input"
+      placeholder="이름, 이메일, 대학교, 전공 검색..."
+      oninput="onSearch()"
+    >
   </div>
 
   <div class="sort-wrap">
@@ -93,6 +107,7 @@
   <div class="table-meta">
     <span class="table-count" id="tbl-count">불러오는 중...</span>
   </div>
+
   <div class="table-wrap">
     <table>
       <thead>
@@ -108,7 +123,9 @@
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="8" class="loading-cell">불러오는 중...</td></tr>
+        <tr>
+          <td colspan="8" class="loading-cell">불러오는 중...</td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -126,131 +143,346 @@
     </div>
     <button class="panel-close" onclick="closePanel()" title="닫기 (Esc)">✕</button>
   </div>
+
   <div class="panel-tabs">
     <button class="panel-tab active" id="pt-app" onclick="switchTab('app')">📄 지원서</button>
-    <button class="panel-tab" id="pt-eval" onclick="switchTab('eval')">✏️ 평가</button>
     <div class="panel-tab-actions">
       <button class="panel-nav-btn" id="prev-applicant" onclick="moveApplicant(-1)" title="이전 지원자">이전</button>
       <button class="panel-nav-btn" id="next-applicant" onclick="moveApplicant(1)" title="다음 지원자">다음</button>
     </div>
   </div>
+
   <div class="panel-body" id="panel-body">
     <div class="loading-cell">불러오는 중...</div>
   </div>
 </div>
 
 <script>
-// ── State ────────────────────────────────────────────────
+/* ── State ──────────────────────────────────────────────── */
 const S = {
-  filters: { recruitment_id:'', track:'', status:'', decision:'', search:'', sort:'created_at', order:'desc' },
+  filters: {
+    recruitment_id: '',
+    track: '',
+    status: '',
+    decision: '',
+    search: '',
+    sort: 'created_at',
+    order: 'desc'
+  },
   applicants: [],
   currentId: null,
   currentData: null,
   tab: 'app',
-  draft: { decision:'pending', score:null, memo:'' },
 };
 
-// ── Utils ────────────────────────────────────────────────
+/* ── Utils ──────────────────────────────────────────────── */
 function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
+
 function debounce(fn, ms) {
   let t;
-  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  return (...a) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...a), ms);
+  };
 }
+
 function fmtDate(s) {
   if (!s) return '—';
   const d = new Date(s);
-  return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 }
+
 function fmtDateTime(s) {
   if (!s) return '';
   const d = new Date(s);
-  return `${fmtDate(s)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return `${fmtDate(s)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-// Badges
-const TRACK_LABEL = { ANALYSIS:'분석', VISUALIZATION:'시각화', ENGINEERING:'엔지니어링', ALL:'전체' };
+/* ── Badges ─────────────────────────────────────────────── */
+const TRACK_LABEL = {
+  ANALYSIS: '분석',
+  VISUALIZATION: '시각화',
+  ENGINEERING: '엔지니어링',
+  ALL: '전체'
+};
+
 function trackBadge(t) {
-  const cls = ['ANALYSIS','VISUALIZATION','ENGINEERING'].includes(t) ? t : '기타';
+  const cls = ['ANALYSIS', 'VISUALIZATION', 'ENGINEERING'].includes(t) ? t : '기타';
   return `<span class="badge track-${cls}">${esc(TRACK_LABEL[t] || t || '—')}</span>`;
 }
+
 function decBadge(ev) {
   const d = ev?.decision || 'pending';
-  const lbl = {pending:'검토중', pass:'합격', fail:'불합격', hold:'보류'}[d] || d;
+  const lbl = {
+    pending: '검토중',
+    pass: '합격',
+    fail: '불합격',
+    hold: '보류'
+  }[d] || d;
+
   return `<span class="badge d-${d}">${lbl}</span>`;
 }
-
-// ── API ──────────────────────────────────────────────────
-async function get(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+function tryParseJson(value) {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed || !/^[\[{]/.test(trimmed)) return value;
+  try { return JSON.parse(trimmed); } catch (_) { return value; }
 }
-async function post(url, data) {
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(data),
+function isUrl(value) {
+  return /^https?:\/\/\S+$/i.test(String(value || '').trim());
+}
+function linkifyText(value) {
+  const text = String(value ?? '');
+  const urlPattern = /(https?:\/\/[^\s<]+)/g;
+  let lastIndex = 0;
+  let html = '';
+
+  text.replace(urlPattern, (url, _match, offset) => {
+    html += esc(text.slice(lastIndex, offset));
+    html += `<a class="answer-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`;
+    lastIndex = offset + url.length;
+    return url;
   });
-  return r.json();
+
+  html += esc(text.slice(lastIndex));
+  return html || '답변 없음';
+}
+function formatAnswerKey(key) {
+  const labels = { date:'날짜', day:'요일', time:'시간', start:'시작', end:'종료', available:'가능 여부', memo:'메모' };
+  return labels[key] || String(key).replace(/_/g, ' ');
+}
+function renderNestedAnswerValue(value) {
+  if (Array.isArray(value)) {
+    if (!value.length) return '<em>-</em>';
+    return `<div class="answer-chip-row">${value.map(item => `<span>${esc(typeof item === 'object' && item !== null ? JSON.stringify(item) : item)}</span>`).join('')}</div>`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value);
+    if (!entries.length) return '<em>-</em>';
+    return `<div class="answer-mini-grid">${entries.map(([key, val]) => `<div><span>${esc(formatAnswerKey(key))}</span><strong>${esc(Array.isArray(val) ? val.join(', ') : val ?? '-')}</strong></div>`).join('')}</div>`;
+  }
+  return esc(value ?? '-');
+}
+function renderObjectAnswer(value) {
+  const entries = Object.entries(value || {});
+  if (!entries.length) return '<div class="answer-text muted">답변 없음</div>';
+  return `<div class="answer-json-grid">${entries.map(([key, val]) => `<div class="answer-json-row"><span>${esc(formatAnswerKey(key))}</span><strong>${renderNestedAnswerValue(val)}</strong></div>`).join('')}</div>`;
+}
+function renderArrayAnswer(items) {
+  if (!items.length) return '<div class="answer-text muted">답변 없음</div>';
+  if (items.every(item => typeof item === 'object' && item !== null && !Array.isArray(item))) {
+    return `<div class="answer-time-grid">${items.map(item => {
+      const primary = item.date || item.day || item.time || item.label || item.name || '-';
+      const secondary = [item.start, item.end].filter(Boolean).join(' - ') || item.value || item.available || item.memo || '';
+      return `<div class="answer-time-card"><span>${esc(primary)}</span><strong>${esc(secondary || '-')}</strong></div>`;
+    }).join('')}</div>`;
+  }
+  return `<div class="answer-list">${items.map(item => `<div>${esc(typeof item === 'object' ? JSON.stringify(item) : item)}</div>`).join('')}</div>`;
+}
+function renderAnswerValue(rawAnswer) {
+  const answer = tryParseJson(rawAnswer);
+  if (Array.isArray(answer)) return renderArrayAnswer(answer);
+  if (answer && typeof answer === 'object') return renderObjectAnswer(answer);
+  if (isUrl(answer)) {
+    const url = String(answer).trim();
+    return `<a class="answer-link-card" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`;
+  }
+  return `<div class="answer-text">${linkifyText(answer || '답변 없음')}</div>`;
 }
 
-// ── Init ─────────────────────────────────────────────────
+/* ── API ────────────────────────────────────────────────── */
+const API_BASE_URL = 'https://dev.bigdataboaz.com';
+
+function apiUrl(path) {
+  return path.startsWith('http') ? path : API_BASE_URL + path;
+}
+
+function authHeaders(extra = {}) {
+  const token = sessionStorage.getItem('access_token');
+
+  return {
+    ...extra,
+    ...(token ? { Authorization: 'Bearer ' + token } : {})
+  };
+}
+
+function unwrapApiResponse(result) {
+  return result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result;
+}
+
+function toApiDecision(decision) {
+  return String(decision || 'pending').toUpperCase();
+}
+
+function fromApiDecision(decision) {
+  return String(decision || 'PENDING').toLowerCase();
+}
+
+function normalizeRecruitments(result) {
+  return (unwrapApiResponse(result) || []).map(item => ({
+    ...item,
+    id: item.recruitment_id || item.id,
+    label: item.term ? `${item.term}기` : `공고 #${item.recruitment_id || item.id}`
+  })).filter(item => item.id);
+}
+
+function normalizeApplicant(applicant) {
+  const submittedAt = applicant.submitted_at || applicant.created_at || applicant.updated_at;
+
+  return {
+    ...applicant,
+    created_at: submittedAt,
+    submitted_at: submittedAt,
+    eval: applicant.evaluation || applicant.personal_evaluation || { decision: 'pending' },
+    final_decision: fromApiDecision(applicant.final_decision)
+  };
+}
+
+function applicantListUrl(recruitmentId) {
+  return '/api/v1/admin/recruitment/' + encodeURIComponent(recruitmentId) + '/applicants';
+}
+
+async function request(url, options = {}) {
+  const fullUrl = apiUrl(url);
+  const headers = authHeaders(options.headers || {});
+
+  const response = await fetch(fullUrl, {
+    credentials: 'include',
+    ...options,
+    headers
+  });
+
+  let result = null;
+  try {
+    result = await response.json();
+  } catch (_) {}
+
+  if (!response.ok) {
+    throw new Error(result?.message || result?.error?.message || result?.error_code || `HTTP ${response.status}`);
+  }
+
+  return unwrapApiResponse(result);
+}
+
+function get(url) {
+  return request(url, { method: 'GET' });
+}
+
+function put(url, data) {
+  return request(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+}
+
+function renderHeaderStats(applicants) {
+  const order = ['ANALYSIS', 'VISUALIZATION', 'ENGINEERING'];
+  const byTrack = applicants.reduce((acc, item) => {
+    acc[item.track] = (acc[item.track] || 0) + 1;
+    return acc;
+  }, {});
+
+  let html = `<div class="stat-chip total">전체 <strong>${applicants.length}</strong>명</div>`;
+
+  order.forEach(track => {
+    if (byTrack[track]) {
+      html += `<div class="stat-chip track-${track}">${TRACK_LABEL[track] || track} ${byTrack[track]}</div>`;
+    }
+  });
+
+  document.getElementById('header-stats').innerHTML = html;
+}
+
+function filteredApplicants(applicants) {
+  const f = S.filters;
+  const keyword = f.search.trim().toLowerCase();
+
+  return applicants.filter(item => {
+    if (f.track && item.track !== f.track) return false;
+    if (f.status && item.status !== f.status) return false;
+    if (f.decision && fromApiDecision(item.eval?.decision) !== f.decision) return false;
+    if (!keyword) return true;
+
+    return [item.name, item.email, item.university, item.major]
+      .some(value => String(value || '').toLowerCase().includes(keyword));
+  }).sort((a, b) => {
+    const { sort, order } = f;
+    const dir = order === 'asc' ? 1 : -1;
+    const av = a[sort] || '';
+    const bv = b[sort] || '';
+
+    if (sort === 'created_at') {
+      return (new Date(av).getTime() - new Date(bv).getTime()) * dir;
+    }
+
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+}
+
+async function loadApplicantAnswers(applicantId) {
+  const result = await get('/api/v1/admin/recruitment/applicants/' + applicantId + '/answers');
+  return (result && result.answers) || [];
+}
+
+/* ── Init ───────────────────────────────────────────────── */
 async function init() {
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closePanel();
+  });
+
   await loadRecruitments();
-  await Promise.all([loadStats(), loadApplicants()]);
+  await loadApplicants();
 }
 
 async function loadRecruitments() {
   try {
-    const ids = await get('/api/recruitments');
+    const recruitments = normalizeRecruitments(await get('/api/v1/admin/recruitment'));
     const sel = document.getElementById('sel-rec');
-    ids.forEach(id => {
-      const o = document.createElement('option');
-      o.value = id;
-      o.textContent = `공고 #${id}`;
-      sel.appendChild(o);
+
+    sel.innerHTML = '<option value="">공고 선택</option>';
+
+    recruitments.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.label;
+      sel.appendChild(option);
     });
-    if (ids.length > 0) {
-      sel.value = ids[0];
-      S.filters.recruitment_id = String(ids[0]);
+
+    if (recruitments.length > 0) {
+      const active = recruitments.find(item => item.is_active) || recruitments[0];
+      sel.value = active.id;
+      S.filters.recruitment_id = String(active.id);
     }
-  } catch(e) { console.warn('recruitments:', e); }
+  } catch (e) {
+    console.warn('recruitments:', e);
+  }
 }
 
-async function loadStats() {
-  try {
-    const q = S.filters.recruitment_id ? `?recruitment_id=${S.filters.recruitment_id}` : '';
-    const d = await get('/api/stats' + q);
-    const order = ['ANALYSIS','VISUALIZATION','ENGINEERING'];
-    const byTrack = Object.fromEntries((d.by_track||[]).map(r=>[r.track, r.cnt]));
-    let html = `<div class="stat-chip total">전체 <strong>${d.total}</strong>명</div>`;
-    order.forEach(t => {
-      if (byTrack[t]) html += `<div class="stat-chip track-${t}">${TRACK_LABEL[t]||t} ${byTrack[t]}</div>`;
-    });
-    document.getElementById('header-stats').innerHTML = html;
-  } catch(e) { console.warn('stats:', e); }
-}
-
-// ── Applicants ───────────────────────────────────────────
+/* ── Applicants ─────────────────────────────────────────── */
 async function loadApplicants() {
   document.getElementById('tbody').innerHTML =
     '<tr><td colspan="8" class="loading-cell">불러오는 중...</td></tr>';
-  try {
-    const f = S.filters;
-    const p = new URLSearchParams();
-    if (f.recruitment_id) p.set('recruitment_id', f.recruitment_id);
-    if (f.track)          p.set('track', f.track);
-    if (f.status)         p.set('status', f.status);
-    if (f.decision)       p.set('decision', f.decision);
-    if (f.search)         p.set('search', f.search);
-    p.set('sort', f.sort); p.set('order', f.order);
 
-    S.applicants = await get('/api/applicants?' + p);
+  if (!S.filters.recruitment_id) {
+    S.applicants = [];
+    renderHeaderStats([]);
     render();
-  } catch(e) {
+    return;
+  }
+
+  try {
+    const applicants = await get(applicantListUrl(S.filters.recruitment_id));
+    S.applicants = (applicants || []).map(normalizeApplicant);
+    renderHeaderStats(S.applicants);
+    render();
+  } catch (e) {
     document.getElementById('tbody').innerHTML =
       `<tr><td colspan="8" style="text-align:center;padding:40px;color:#ef4444">오류: ${esc(e.message)}</td></tr>`;
   }
@@ -258,85 +490,94 @@ async function loadApplicants() {
 
 function render() {
   const tbody = document.getElementById('tbody');
-  const list  = S.applicants;
+  const list = filteredApplicants(S.applicants);
+
   document.getElementById('tbl-count').innerHTML = `총 <strong>${list.length}</strong>명`;
 
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="8">
-      <div class="empty-state">
-        <div class="icon">🔍</div>
-        <p>조건에 맞는 지원자가 없습니다</p>
-        <small>필터를 변경해보세요</small>
-      </div></td></tr>`;
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8">
+          <div class="empty-state">
+            <div class="icon">🔍</div>
+            <p>조건에 맞는 지원자가 없습니다</p>
+            <small>필터를 변경해보세요</small>
+          </div>
+        </td>
+      </tr>
+    `;
     return;
   }
 
   tbody.innerHTML = list.map(a => `
     <tr class="${a.id === S.currentId ? 'selected' : ''}" onclick="openPanel(${a.id})">
       <td>
-        <div class="applicant-name">${esc(a.name||'—')}</div>
-        <div class="applicant-sub">${esc(a.email||'')}</div>
+        <div class="applicant-name">${esc(a.name || '—')}</div>
+        <div class="applicant-sub">${esc(a.email || '')}</div>
       </td>
       <td>${trackBadge(a.track)}</td>
       <td>
-        <div class="univ-name">${esc(a.university||'—')}</div>
-        <div class="major-name">${esc(a.major||'')}</div>
+        <div class="univ-name">${esc(a.university || '—')}</div>
+        <div class="major-name">${esc(a.major || '')}</div>
       </td>
-      <td style="color:#64748b">${a.last_semester ? a.last_semester+'학기' : '—'}</td>
-      <td style="color:#64748b;white-space:nowrap">${esc(a.graduation_date||'—')}</td>
-      <td style="color:#64748b;white-space:nowrap">${fmtDateTime(a.created_at)}</td>
-      <td><span class="badge status-${a.status||'DRAFT'}">${a.status==='SUBMITTED'?'제출':'임시저장'}</span></td>
+      <td style="color:#64748b">${a.last_semester ? a.last_semester + '학기' : '—'}</td>
+      <td style="color:#64748b;white-space:nowrap">${esc(a.graduation_date || '—')}</td>
+      <td style="color:#64748b;white-space:nowrap">${fmtDateTime(a.submitted_at || a.created_at)}</td>
+      <td><span class="badge status-${a.status || 'DRAFT'}">${a.status === 'SUBMITTED' ? '제출' : '임시저장'}</span></td>
       <td>${decBadge(a.eval)}</td>
-    </tr>`).join('');
+    </tr>
+  `).join('');
 }
 
-// ── Panel ─────────────────────────────────────────────────
+/* ── Panel ───────────────────────────────────────────────── */
 async function openPanel(id, preferredTab = 'app') {
   S.currentId = id;
   S.tab = preferredTab;
+
   document.getElementById('overlay').classList.add('active');
   document.getElementById('panel').classList.add('open');
-  document.getElementById('pt-app').classList.toggle('active', preferredTab === 'app');
-  document.getElementById('pt-eval').classList.toggle('active', preferredTab === 'eval');
+  document.getElementById('pt-app').classList.add('active');
   document.getElementById('panel-body').innerHTML = '<div class="loading-cell">불러오는 중...</div>';
+
   updatePanelNav();
-  // highlight row
+
   document.querySelectorAll('#tbody tr').forEach(tr => {
     tr.classList.toggle('selected', tr.onclick?.toString().includes(`(${id})`));
   });
 
   try {
-    const d = await get(`/api/applicants/${id}`);
+    const d = S.applicants.find(item => item.id === id);
+    if (!d) throw new Error('지원자를 찾을 수 없습니다.');
+
     S.currentData = d;
+
     document.getElementById('p-name').textContent = d.name || '—';
+
     const tb = document.getElementById('p-track');
     tb.textContent = d.track || '';
-    tb.className = `badge track-${['ANALYSIS','VISUALIZATION','ENGINEERING'].includes(d.track)?d.track:'기타'}`;
+    tb.className = `badge track-${['ANALYSIS', 'VISUALIZATION', 'ENGINEERING'].includes(d.track) ? d.track : '기타'}`;
 
-    S.draft = {
-      decision: d.evaluation?.decision || 'pending',
-      score:    d.evaluation?.score    ?? null,
-      memo:     d.evaluation?.memo     || '',
-    };
     renderBody();
-  } catch(e) {
+  } catch (e) {
     document.getElementById('panel-body').innerHTML =
       `<div style="color:#ef4444;padding:20px">오류: ${esc(e.message)}</div>`;
   }
 }
 
 function closePanel() {
-  S.currentId = null; S.currentData = null;
+  S.currentId = null;
+  S.currentData = null;
+
   document.getElementById('overlay').classList.remove('active');
   document.getElementById('panel').classList.remove('open');
   document.querySelectorAll('#tbody tr').forEach(tr => tr.classList.remove('selected'));
+
   updatePanelNav();
 }
 
 function switchTab(tab) {
-  S.tab = tab;
-  document.getElementById('pt-app').classList.toggle('active', tab==='app');
-  document.getElementById('pt-eval').classList.toggle('active', tab==='eval');
+  S.tab = 'app';
+  document.getElementById('pt-app').classList.add('active');
   renderBody();
 }
 
@@ -345,7 +586,9 @@ function updatePanelNav() {
   const idx = list.findIndex(a => a.id === S.currentId);
   const prev = document.getElementById('prev-applicant');
   const next = document.getElementById('next-applicant');
+
   if (!prev || !next) return;
+
   prev.disabled = idx <= 0;
   next.disabled = idx === -1 || idx >= list.length - 1;
 }
@@ -353,31 +596,46 @@ function updatePanelNav() {
 function moveApplicant(step) {
   const list = S.applicants;
   const idx = list.findIndex(a => a.id === S.currentId);
+
   if (idx === -1 || !list.length) return;
+
   const next = list[idx + step];
+
   if (!next) return;
-  openPanel(next.id, S.tab);
+
+  openPanel(next.id);
   render();
 }
 
-function renderBody() {
+async function renderBody() {
   if (!S.currentData) return;
+
   const el = document.getElementById('panel-body');
-  el.innerHTML = S.tab === 'app' ? buildAppTab(S.currentData) : buildEvalTab(S.currentData);
-  if (S.tab === 'eval') bindEval();
+  el.innerHTML = '<div class="loading-cell">지원서 답변을 불러오는 중...</div>';
+  try {
+    S.currentData.answers = await loadApplicantAnswers(S.currentData.id);
+    el.innerHTML = buildAppTab(S.currentData);
+  } catch (e) {
+    el.innerHTML = `<div style="color:#ef4444;padding:20px">오류: ${esc(e.message)}</div>`;
+  }
 }
 
-// ── Application Tab ───────────────────────────────────────
+/* ── Application Tab ─────────────────────────────────────── */
 function buildAppTab(d) {
-  function yn(v) { return v ? '예' : '아니오'; }
+  function yn(v) {
+    return v ? '예' : '아니오';
+  }
 
   let minor = '—';
+
   if (d.minor_double_major) {
-    if (Array.isArray(d.minor_double_major))
+    if (Array.isArray(d.minor_double_major)) {
       minor = d.minor_double_major.join(', ');
-    else if (typeof d.minor_double_major === 'object')
-      minor = Object.entries(d.minor_double_major).map(([k,v])=>`${k}: ${v}`).join(' / ');
-    else minor = String(d.minor_double_major);
+    } else if (typeof d.minor_double_major === 'object') {
+      minor = Object.entries(d.minor_double_major).map(([k, v]) => `${k}: ${v}`).join(' / ');
+    } else {
+      minor = String(d.minor_double_major);
+    }
   }
 
   let html = `
@@ -386,27 +644,27 @@ function buildAppTab(d) {
       <div class="info-grid">
         <div class="info-item">
           <span class="info-lbl">이메일</span>
-          <span class="info-val">${esc(d.email||'—')}</span>
+          <span class="info-val">${esc(d.email || '—')}</span>
         </div>
         <div class="info-item">
           <span class="info-lbl">전화번호</span>
-          <span class="info-val">${esc(d.phone||'—')}</span>
+          <span class="info-val">${esc(d.phone || '—')}</span>
         </div>
         <div class="info-item">
           <span class="info-lbl">생년월일</span>
-          <span class="info-val">${d.birth_date ? String(d.birth_date).substring(0,10) : '—'}</span>
+          <span class="info-val">${d.birth_date ? String(d.birth_date).substring(0, 10) : '—'}</span>
         </div>
         <div class="info-item">
           <span class="info-lbl">병역</span>
-          <span class="info-val">${esc(d.military_status||'—')}</span>
+          <span class="info-val">${esc(d.military_status || '—')}</span>
         </div>
         <div class="info-item">
           <span class="info-lbl">대학교</span>
-          <span class="info-val">${esc(d.university||'—')}</span>
+          <span class="info-val">${esc(d.university || '—')}</span>
         </div>
         <div class="info-item">
           <span class="info-lbl">본전공</span>
-          <span class="info-val">${esc(d.major||'—')}</span>
+          <span class="info-val">${esc(d.major || '—')}</span>
         </div>
         <div class="info-item full">
           <span class="info-lbl">복수 / 부전공</span>
@@ -414,11 +672,11 @@ function buildAppTab(d) {
         </div>
         <div class="info-item">
           <span class="info-lbl">마지막 재학 학기</span>
-          <span class="info-val">${d.last_semester ? d.last_semester+'학기' : '—'}</span>
+          <span class="info-val">${d.last_semester ? d.last_semester + '학기' : '—'}</span>
         </div>
         <div class="info-item">
           <span class="info-lbl">졸업 예정</span>
-          <span class="info-val">${esc(d.graduation_date||'—')}</span>
+          <span class="info-val">${esc(d.graduation_date || '—')}</span>
         </div>
         <div class="info-item">
           <span class="info-lbl">대학원 진학</span>
@@ -430,143 +688,59 @@ function buildAppTab(d) {
         </div>
       </div>
     </div>
+
     <hr class="divider">
+
     <div class="section">
-      <div class="section-title">지원 답변 (${(d.answers||[]).length}개)</div>`;
+      <div class="section-title">지원 답변 (${(d.answers || []).length}개)</div>
+  `;
 
   if (!d.answers || d.answers.length === 0) {
     html += '<p style="color:#94a3b8;font-size:13px">답변이 없습니다.</p>';
   } else {
-    d.answers.forEach((ans, i) => {
-      const qLabel   = ans.q_label   ? esc(ans.q_label)   : `Q${esc(ans.question_id)}`;
-      const qContent = ans.q_content ? esc(ans.q_content) : '';
-      html += `<div class="answer-item">
-        <div class="answer-qid">
-          <span class="qid-tag">${qLabel}</span>
-          ${qContent ? `<span style="font-size:13px;color:#475569;font-weight:500">${qContent}</span>` : ''}
+    d.answers.forEach((ans) => {
+      const label = ans.label || ans.q_label || `Q${ans.question_id}`;
+      const content = ans.content || ans.q_content || '';
+      const answer = ans.answer ?? ans.answer_text ?? ans.answer_json ?? '';
+
+      html += `
+        <div class="answer-item">
+          <div class="answer-qid">
+            <span class="qid-tag">${esc(label)}</span>
+            ${content ? `<span style="font-size:13px;color:#475569;font-weight:500">${esc(content)}</span>` : ''}
+          </div>
+          ${renderAnswerValue(answer)}
         </div>`;
-
-      if (ans.answer_json && typeof ans.answer_json === 'object' && !Array.isArray(ans.answer_json)) {
-        const entries = Object.entries(ans.answer_json);
-        html += `<table class="json-tbl">
-          <thead><tr><th>항목</th><th>수준 / 내용</th></tr></thead>
-          <tbody>`;
-        entries.forEach(([k,v]) => { html += `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`; });
-        html += `</tbody></table>`;
-      } else if (ans.answer_text) {
-        html += `<div class="answer-text">${esc(ans.answer_text)}</div>`;
-      } else {
-        html += `<div class="answer-text" style="color:#94a3b8;font-style:italic">답변 없음</div>`;
-      }
-
-      html += '</div>';
     });
   }
 
   html += '</div>';
+
   return html;
 }
 
-// ── Evaluation Tab ────────────────────────────────────────
-function buildEvalTab(d) {
-  const dr = S.draft;
-  const decMap = [
-    { v:'pass',    label:'합격 ✓',   cls:'sel-pass'    },
-    { v:'fail',    label:'불합격 ✗', cls:'sel-fail'    },
-    { v:'hold',    label:'보류 ～',  cls:'sel-hold'    },
-    { v:'pending', label:'검토중',   cls:'sel-pending' },
-  ];
-
-  const decBtns = decMap.map(o =>
-    `<button class="dec-btn ${dr.decision===o.v?o.cls:''}"
-             data-v="${o.v}" onclick="pickDecision('${o.v}')">${o.label}</button>`
-  ).join('');
-
-  let footer = '';
-  if (d.evaluation?.updated_at) {
-    footer = `<div class="eval-footer">마지막 저장: ${fmtDateTime(d.evaluation.updated_at)}</div>`;
-  }
-
-  return `
-    <div class="section">
-      <span class="eval-label">최종 결정</span>
-      <div class="decision-grid">${decBtns}</div>
-
-      <span class="eval-label">점수 (1 ~ 10)</span>
-      <div class="score-row">
-        <input type="number" class="score-input" id="ev-score"
-               min="1" max="10" step="0.5"
-               value="${dr.score ?? ''}" placeholder="—"
-               oninput="S.draft.score = this.value ? parseFloat(this.value) : null">
-        <span class="score-suffix">/ 10점</span>
-      </div>
-
-      <span class="eval-label">메모</span>
-      <textarea class="memo-area" id="ev-memo"
-                placeholder="평가 메모를 입력하세요..."
-                oninput="S.draft.memo = this.value">${esc(dr.memo)}</textarea>
-
-      <button class="save-btn" id="save-btn" onclick="saveEval()">저장하기</button>
-      <div class="save-msg" id="save-msg"></div>
-      ${footer}
-    </div>`;
-}
-
-function bindEval() { /* oninput handlers inline */ }
-
-function pickDecision(v) {
-  S.draft.decision = v;
-  const clsMap = { pass:'sel-pass', fail:'sel-fail', hold:'sel-hold', pending:'sel-pending' };
-  document.querySelectorAll('.dec-btn').forEach(btn => {
-    btn.className = `dec-btn ${btn.dataset.v === v ? clsMap[btn.dataset.v] : ''}`;
-  });
-}
-
-async function saveEval() {
-  if (!S.currentId) return;
-  const btn = document.getElementById('save-btn');
-  const msg = document.getElementById('save-msg');
-  btn.disabled = true; btn.textContent = '저장 중...';
-  msg.className = 'save-msg'; msg.textContent = '';
-
-  try {
-    await post(`/api/evaluations/${S.currentId}`, S.draft);
-    msg.className = 'save-msg ok'; msg.textContent = '✓ 저장되었습니다';
-    btn.textContent = '저장하기'; btn.disabled = false;
-
-    // Update list row in memory + DOM
-    const idx = S.applicants.findIndex(a => a.id === S.currentId);
-    if (idx !== -1) {
-      S.applicants[idx].eval = { ...S.draft };
-      const rows = document.querySelectorAll('#tbody tr');
-      if (rows[idx]) {
-        const cell = rows[idx].querySelector('td:last-child');
-        if (cell) cell.innerHTML = decBadge(S.draft);
-      }
-    }
-    if (S.currentData) S.currentData.evaluation = { ...S.draft };
-
-    setTimeout(() => { if(msg) msg.textContent = ''; }, 3000);
-  } catch(e) {
-    msg.className = 'save-msg err'; msg.textContent = '⚠ 저장 실패: ' + e.message;
-    btn.textContent = '저장하기'; btn.disabled = false;
-  }
-}
-
-// ── Filter Handlers ───────────────────────────────────────
+/* ── Filter Handlers ─────────────────────────────────────── */
 function onRecChange() {
   S.filters.recruitment_id = document.getElementById('sel-rec').value;
-  loadStats();
+
   loadApplicants();
 }
 
 function setPill(type, btn, val) {
-  const groupIds = { track:'track-pills', status:'status-pills', decision:'decision-pills' };
+  const groupIds = {
+    track: 'track-pills',
+    status: 'status-pills',
+    decision: 'decision-pills'
+  };
+
   document.querySelectorAll(`#${groupIds[type]} .pill`).forEach(b => b.classList.remove('active'));
+
   btn.classList.add('active');
-  if (type === 'track')    S.filters.track    = val;
-  if (type === 'status')   S.filters.status   = val;
+
+  if (type === 'track') S.filters.track = val;
+  if (type === 'status') S.filters.status = val;
   if (type === 'decision') S.filters.decision = val;
+
   loadApplicants();
 }
 
@@ -577,63 +751,135 @@ const onSearch = debounce(() => {
 
 function onSortChange() {
   const [col, ord] = document.getElementById('sel-sort').value.split('|');
-  S.filters.sort = col; S.filters.order = ord;
+
+  S.filters.sort = col;
+  S.filters.order = ord;
+
   loadApplicants();
 }
 
-// ── Go ────────────────────────────────────────────────────
+/* ── Auth ───────────────────────────────────────────────── */
 async function refreshAccessToken() {
-  const response = await fetch('/api/v1/auth/refresh', {
-    method: 'POST',
-    credentials: 'include',
-  });
-  if (!response.ok) return null;
-  const result = await response.json();
-  const token = result && result.data && result.data.access_token;
-  if (token) sessionStorage.setItem('access_token', token);
-  return token || null;
+  const refreshUrls = [
+    '/api/v1/auth/admin/refresh'
+  ];
+
+  for (const path of refreshUrls) {
+    try {
+      const response = await fetch(apiUrl(path), {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (!response.ok) continue;
+
+      const result = await response.json();
+
+      const token =
+        result?.data?.access_token ||
+        result?.data?.accessToken ||
+        result?.access_token ||
+        result?.accessToken;
+
+      if (token) {
+        sessionStorage.setItem('access_token', token);
+        return token;
+      }
+    } catch (error) {
+      console.warn('refresh failed:', path, error);
+    }
+  }
+
+  return null;
 }
 
 async function getCurrentAccount() {
   let token = sessionStorage.getItem('access_token');
-  if (!token) token = await refreshAccessToken();
-  if (!token) return null;
 
-  let response = await fetch('/api/v1/auth/me', {
-    headers: { Authorization: 'Bearer ' + token },
+  if (!token) {
+    token = await refreshAccessToken();
+  }
+
+  if (!token) {
+    return null;
+  }
+
+  const fallbackAccount = { username: '관리자' };
+
+  let response = await fetch(apiUrl('/api/v1/admin/accounts/me'), {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      Authorization: 'Bearer ' + token
+    }
   });
+
   if (response.status === 401) {
     token = await refreshAccessToken();
-    if (!token) return null;
-    response = await fetch('/api/v1/auth/me', {
-      headers: { Authorization: 'Bearer ' + token },
+
+    if (!token) {
+      return null;
+    }
+
+    response = await fetch(apiUrl('/api/v1/admin/accounts/me'), {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        Authorization: 'Bearer ' + token
+      }
     });
   }
-  if (!response.ok) return null;
+
+  if (!response.ok) {
+    return fallbackAccount;
+  }
+
   const result = await response.json();
-  return (result && result.data) || null;
+
+  return result?.data || result?.user || result?.account || result || fallbackAccount;
+}
+
+async function logoutAdmin() {
+  try {
+    await fetch(apiUrl('/api/v1/auth/admin/logout'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: authHeaders()
+    });
+  } catch (error) {
+    console.warn('logout failed:', error);
+  } finally {
+    sessionStorage.removeItem('access_token');
+    window.location.href = '/login.html';
+  }
 }
 
 async function renderAuthStatus() {
   const box = document.getElementById('auth-status');
-  const text = document.getElementById('auth-status-text');
-  if (!box || !text) return;
+
+  if (!box) return;
 
   try {
     const account = await getCurrentAccount();
+
     if (!account) {
       box.className = 'auth-status signed-out';
-      box.innerHTML = '<span class="auth-dot" aria-hidden="true"></span><a class="auth-status-link" href="/login">로그인 필요</a>';
+      box.innerHTML =
+        '<span class="auth-dot" aria-hidden="true"></span><a class="auth-status-link" id="auth-status-text" href="/login.html">로그인</a>';
       return;
     }
+
     box.className = 'auth-status signed-in';
-    text.textContent = (account.username || '사용자') + ' 로그인됨';
+    box.innerHTML =
+      `<span class="auth-dot" aria-hidden="true"></span><span class="auth-status-link">${esc(account.name || account.username || account.team_name || '관리자')} 로그인됨</span><button class="auth-logout" type="button" onclick="logoutAdmin()">로그아웃</button>`;
   } catch (error) {
     box.className = 'auth-status signed-out';
-    text.textContent = '로그인 확인 실패';
+    box.innerHTML =
+      '<span class="auth-dot" aria-hidden="true"></span><a class="auth-status-link" id="auth-status-text" href="/login.html">로그인</a>';
   }
 }
 
+/* ── Go ─────────────────────────────────────────────────── */
 init();
 renderAuthStatus();
 </script>
