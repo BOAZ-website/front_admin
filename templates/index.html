@@ -21,6 +21,10 @@
       <a class="header-link active" href="/">지원자</a>
       <a class="header-link" href="/evaluations">평가자</a>
     </nav>
+    <div class="auth-status" id="auth-status">
+      <span class="auth-dot checking" aria-hidden="true"></span>
+      <span id="auth-status-text">로그인 확인 중</span>
+    </div>
   </div>
   <div class="header-stats" id="header-stats"></div>
 </header>
@@ -183,9 +187,9 @@ async function get(url) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
-async function post(url, data, method = 'POST') {
+async function post(url, data) {
   const r = await fetch(url, {
-    method,
+    method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(data),
   });
@@ -237,14 +241,14 @@ async function loadApplicants() {
   try {
     const f = S.filters;
     const p = new URLSearchParams();
+    if (f.recruitment_id) p.set('recruitment_id', f.recruitment_id);
     if (f.track)          p.set('track', f.track);
     if (f.status)         p.set('status', f.status);
     if (f.decision)       p.set('decision', f.decision);
     if (f.search)         p.set('search', f.search);
     p.set('sort', f.sort); p.set('order', f.order);
 
-    const qs = p.toString();
-    S.applicants = await get(`/api/v1/admin/recruitment/${f.recruitment_id}/applicants` + (qs ? '?' + qs : ''));
+    S.applicants = await get('/api/applicants?' + p);
     render();
   } catch(e) {
     document.getElementById('tbody').innerHTML =
@@ -526,7 +530,7 @@ async function saveEval() {
   msg.className = 'save-msg'; msg.textContent = '';
 
   try {
-    await post(`/api/v1/admin/recruitment/applicants/${S.currentId}/evaluations/me`, S.draft, 'PUT');
+    await post(`/api/evaluations/${S.currentId}`, S.draft);
     msg.className = 'save-msg ok'; msg.textContent = '✓ 저장되었습니다';
     btn.textContent = '저장하기'; btn.disabled = false;
 
@@ -578,7 +582,60 @@ function onSortChange() {
 }
 
 // ── Go ────────────────────────────────────────────────────
+async function refreshAccessToken() {
+  const response = await fetch('/api/v1/auth/refresh', {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) return null;
+  const result = await response.json();
+  const token = result && result.data && result.data.access_token;
+  if (token) sessionStorage.setItem('access_token', token);
+  return token || null;
+}
+
+async function getCurrentAccount() {
+  let token = sessionStorage.getItem('access_token');
+  if (!token) token = await refreshAccessToken();
+  if (!token) return null;
+
+  let response = await fetch('/api/v1/auth/me', {
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  if (response.status === 401) {
+    token = await refreshAccessToken();
+    if (!token) return null;
+    response = await fetch('/api/v1/auth/me', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+  }
+  if (!response.ok) return null;
+  const result = await response.json();
+  return (result && result.data) || null;
+}
+
+async function renderAuthStatus() {
+  const box = document.getElementById('auth-status');
+  const text = document.getElementById('auth-status-text');
+  if (!box || !text) return;
+
+  try {
+    const account = await getCurrentAccount();
+    if (!account) {
+      box.className = 'auth-status signed-out';
+      box.innerHTML = '<span class="auth-dot" aria-hidden="true"></span><a class="auth-status-link" href="/login">로그인 필요</a>';
+      return;
+    }
+    box.className = 'auth-status signed-in';
+    text.textContent = (account.username || '사용자') + ' 로그인됨';
+  } catch (error) {
+    box.className = 'auth-status signed-out';
+    text.textContent = '로그인 확인 실패';
+  }
+}
+
 init();
+renderAuthStatus();
 </script>
 </body>
 </html>

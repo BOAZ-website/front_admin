@@ -19,6 +19,10 @@
       <a class="header-link" href="/">지원자</a>
       <a class="header-link active" href="/evaluations">평가자</a>
     </nav>
+    <div class="auth-status" id="auth-status">
+      <span class="auth-dot checking" aria-hidden="true"></span>
+      <span id="auth-status-text">로그인 확인 중</span>
+    </div>
   </div>
   <div class="header-stats" id="header-stats"></div>
 </header>
@@ -221,13 +225,13 @@ async function loadEvaluationDashboard() {
   try {
     const f = S.filters;
     const p = new URLSearchParams();
+    if (f.recruitment_id) p.set('recruitment_id', f.recruitment_id);
     if (f.track) p.set('track', f.track);
     if (f.search) p.set('search', f.search);
     p.set('sort', 'created_at');
     p.set('order', 'desc');
 
-    const qs = p.toString();
-    const applicants = await get(`/api/v1/admin/recruitment/${f.recruitment_id}/applicants/evaluations` + (qs ? '?' + qs : ''));
+    const applicants = await get('/api/applicants?' + p);
     S.rows = normalizeRows(applicants);
     render();
   } catch(e) {
@@ -390,7 +394,7 @@ function buildFinalTab() {
       <span class="eval-label">개인 점수</span>
       <div class="score-row">
         <input class="score-input" type="number" min="0" max="100" step="1" value="${dr.score ?? ''}" oninput="S.finalDraft.score = this.value ? Number(this.value) : null">
-        <span class="score-suffix">/ 100점</span>
+        <span class="score-suffix">/ 10점</span>
       </div>
       <span class="eval-label">대표진 메모</span>
       <textarea class="memo-area" oninput="S.finalDraft.memo = this.value" placeholder="개인 평가 메모">${esc(dr.memo || '')}</textarea>
@@ -425,6 +429,7 @@ function buildApplicationTab(d) {
         </div>`).join('') : '<p style="color:#94a3b8;font-size:13px">답변이 없습니다.</p>'}
     </div>`;
 }
+
 const FINAL_OPTIONS = ['pending','pass','hold','fail'];
 function finalSelect(a) {
   const cur = a.final_evaluation?.decision || 'pending';
@@ -448,10 +453,11 @@ async function changeFinal(id, next) {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
   } catch(e) {
     console.warn('최종 평가 저장 실패:', e);
-    row.final_evaluation.decision = prev;
+    row.final_evaluation = { ...(row.final_evaluation || {}), decision: prev };
     render();
   }
 }
+
 function pickFinalDecision(v) {
   S.finalDraft.decision = v;
   renderPanelBody();
@@ -489,7 +495,60 @@ function onSortChange() {
   render();
 }
 
+async function refreshAccessToken() {
+  const response = await fetch('/api/v1/auth/refresh', {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) return null;
+  const result = await response.json();
+  const token = result && result.data && result.data.access_token;
+  if (token) sessionStorage.setItem('access_token', token);
+  return token || null;
+}
+
+async function getCurrentAccount() {
+  let token = sessionStorage.getItem('access_token');
+  if (!token) token = await refreshAccessToken();
+  if (!token) return null;
+
+  let response = await fetch('/api/v1/auth/me', {
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  if (response.status === 401) {
+    token = await refreshAccessToken();
+    if (!token) return null;
+    response = await fetch('/api/v1/auth/me', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+  }
+  if (!response.ok) return null;
+  const result = await response.json();
+  return (result && result.data) || null;
+}
+
+async function renderAuthStatus() {
+  const box = document.getElementById('auth-status');
+  const text = document.getElementById('auth-status-text');
+  if (!box || !text) return;
+
+  try {
+    const account = await getCurrentAccount();
+    if (!account) {
+      box.className = 'auth-status signed-out';
+      box.innerHTML = '<span class="auth-dot" aria-hidden="true"></span><a class="auth-status-link" href="/login">로그인 필요</a>';
+      return;
+    }
+    box.className = 'auth-status signed-in';
+    text.textContent = (account.username || '사용자') + ' 로그인됨';
+  } catch (error) {
+    box.className = 'auth-status signed-out';
+    text.textContent = '로그인 확인 실패';
+  }
+}
+
 init();
+renderAuthStatus();
 </script>
 </body>
 </html>
