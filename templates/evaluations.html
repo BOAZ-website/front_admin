@@ -244,7 +244,7 @@ function renderAnswerValue(rawAnswer) {
   }
   return `<div class="answer-text">${linkifyText(answer || '답변 없음')}</div>`;
 }
-const API_BASE_URL = 'https://dev.bigdataboaz.com';
+const API_BASE_URL = 'https://api.bigdataboaz.com';
 function apiUrl(path) {
   return path.startsWith('http') ? path : API_BASE_URL + path;
 }

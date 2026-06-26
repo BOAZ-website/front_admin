@@ -63,8 +63,7 @@
         const submit = document.getElementById('login-submit');
         const errorBox = document.getElementById('login-error');
 
-        // 반드시 admin.bigdataboaz.com이 아니라 dev.bigdataboaz.com으로 요청
-        const LOGIN_API_URL = 'https://dev.bigdataboaz.com/api/v1/auth/admin/login';
+        const LOGIN_API_URL = 'https://api.bigdataboaz.com/api/v1/auth/admin/login';
 
         form.addEventListener('submit', async (event) => {
           event.preventDefault();
