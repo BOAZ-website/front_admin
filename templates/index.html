@@ -349,19 +349,29 @@ function applicantListUrl(recruitmentId) {
 }
 
 async function request(url, options = {}) {
-  const fullUrl = apiUrl(url);
-  const headers = authHeaders(options.headers || {});
+  const send = async () => {
+    const response = await fetch(apiUrl(url), {
+      credentials: 'include',
+      ...options,
+      headers: authHeaders(options.headers || {})
+    });
 
-  const response = await fetch(fullUrl, {
-    credentials: 'include',
-    ...options,
-    headers
-  });
+    let result = null;
+    try {
+      result = await response.json();
+    } catch (_) {}
 
-  let result = null;
-  try {
-    result = await response.json();
-  } catch (_) {}
+    return { response, result };
+  };
+
+  let { response, result } = await send();
+
+  if (response.status === 401) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) {
+      ({ response, result } = await send());
+    }
+  }
 
   if (!response.ok) {
     throw new Error(result?.message || result?.error?.message || result?.error_code || `HTTP ${response.status}`);
